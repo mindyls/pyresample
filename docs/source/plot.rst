@@ -1,141 +1,87 @@
 .. _plot:
 
-Plotting with pyresample and Basemap
+Plotting with pyresample and Cartopy
 ====================================
-Pyresample supports basic integration with Basemap (http://matplotlib.sourceforge.net/basemap).
+
+Pyresample supports basic integration with Cartopy_.
 
 Displaying data quickly
 -----------------------
-Pyresample has some convenience functions for displaying data from a single channel. 
-The function **plot.show_quicklook** shows a Basemap image of a dataset for a specified AreaDefinition.
-The function **plot.save_quicklook** saves the Basemap image directly to file.
+Pyresample has some convenience functions for displaying data from a single
+channel. The :func:`show_quicklook <pyresample.plot.show_quicklook>` function
+shows a Cartopy generated image of a dataset for a specified AreaDefinition.
+The function :func:`save_quicklook <pyresample.plot.save_quicklook>` saves the Cartopy image directly to file.
 
 **Example usage:**
 
+In this simple example below we use GCOM-W1 AMSR-2 data loaded using Satpy_.
+Satpy simplifies the reading of this data, but is not necessary for using
+pyresample or plotting data.
+
+First we read in the data with Satpy_:
+
+ >>> from satpy.scene import Scene
+ >>> from glob import glob
+ >>> SCENE_FILES = glob("./GW1AM2_20191122????_156*h5")
+ >>> scn = Scene(reader='amsr2_l1b', filenames=SCENE_FILES)
+ >>> scn.load(["btemp_36.5v"])
+ >>> lons, lats = scn["btemp_36.5v"].area.get_lonlats()
+ >>> tb37v = scn["btemp_36.5v"].data.compute()
+
+Data for this example can be downloaded from zenodo_.
+
+If you have your own data, or just want to see that the example code here runs, you can
+set the three arrays :code:`lons`, :code:`lats` and :code:`tb37v` accordingly, e.g.:
+
 .. doctest::
 
- >>> import numpy as np	
- >>> import pyresample as pr
- >>> lons = np.zeros(1000)
- >>> lats = np.arange(-80, -90, -0.01)
- >>> tb37v = np.arange(1000)
- >>> area_def = pr.utils.load_area('/tmp/areas.cfg', 'ease_sh')
- >>> swath_def = pr.geometry.SwathDefinition(lons, lats)
- >>> result = pr.kd_tree.resample_nearest(swath_def, tb37v, area_def,
- ...                                      radius_of_influence=20000, fill_value=None)
- >>> pr.plot.save_quicklook('/tmp/tb37v_quick.png', area_def, result, label='Tb 37v (K)')
+   >>> from pyresample.geometry import AreaDefinition
+   >>> area_id = 'ease_sh'
+   >>> description = 'Antarctic EASE grid'
+   >>> proj_id = 'ease_sh'
+   >>> projection = {'proj': 'laea', 'lat_0': -90, 'lon_0': 0, 'a': 6371228.0, 'units': 'm'}
+   >>> width = 425
+   >>> height = 425
+   >>> area_extent = (-5326849.0625, -5326849.0625, 5326849.0625, 5326849.0625)
+   >>> area_def = AreaDefinition(area_id, description, proj_id, projection,
+   ...                           width, height, area_extent)
 
-Assuming **lons**, **lats** and **tb37v** are initialized with real data the result might look something like this:
+But here we go on with the loaded AMSR-2 data. Make sure you have an :code:`areas.yaml`
+file that defines the :code:`ease_sh` area, or see
+:ref:`the area definition section<area-definitions>` on how to define one.
+
+.. testsetup::
+
+   import numpy as np
+   lons = np.repeat(np.linspace(-95, -70, 100)[np.newaxis], 10, axis=0).ravel()
+   lats = np.linspace(-80, -90, 1000)
+   tb37v = np.arange(1000)
+   if plt is not None:
+       import matplotlib
+       matplotlib.use('agg')
+
+.. doctest::
+   :skipif: plt is None
+
+   >>> from pyresample import load_area, save_quicklook, SwathDefinition
+   >>> from pyresample.kd_tree import resample_nearest
+   >>> swath_def = SwathDefinition(lons, lats)
+   >>> result = resample_nearest(swath_def, tb37v, area_def,
+   ...                           radius_of_influence=20000, fill_value=None)
+   >>> save_quicklook('tb37v_quick.png', area_def, result, label='Tb 37v (K)')
+ 
+Assuming **lons**, **lats** and **tb37v** are initialized with real data (as in
+the above Satpy_ example) the result might look something like this:
+
   .. image:: _static/images/tb37v_quick.png
   
 The data passed to the functions is a 2D array matching the AreaDefinition.
 
-The Plate Carree projection
-+++++++++++++++++++++++++++
-The Plate Carree projection (regular lon/lat grid) is named **eqc** in Proj.4 and **cyl** in Basemap. pyresample uses the Proj.4 name.
-Assuming the file **/tmp/areas.cfg** has the following area definition:
-
-.. code-block:: bash
-
- REGION: pc_world {
-    NAME:    Plate Carree world map
-    PCS_ID:  pc_world
-    PCS_DEF: proj=eqc
-    XSIZE: 640
-    YSIZE: 480
-    AREA_EXTENT:  (-20037508.34, -10018754.17, 20037508.34, 10018754.17)
- };
-
-**Example usage:**
-
- >>> import numpy as np 
- >>> import pyresample as pr
- >>> lons = np.zeros(1000)
- >>> lats = np.arange(-80, -90, -0.01)
- >>> tb37v = np.arange(1000)
- >>> area_def = pr.utils.load_area('/tmp/areas.cfg', 'pc_world')
- >>> swath_def = pr.geometry.SwathDefinition(lons, lats)
- >>> result = pr.kd_tree.resample_nearest(swath_def, tb37v, area_def, radius_of_influence=20000, fill_value=None)
- >>> pr.plot.save_quicklook('/tmp/tb37v_pc.png', area_def, result, num_meridians=0, num_parallels=0, label='Tb 37v (K)')
-
-Assuming **lons**, **lats** and **tb37v** are initialized with real data the result might look something like this:
-  .. image:: _static/images/tb37v_pc.png
-
-
-The Globe projections
-+++++++++++++++++++++
-From v0.7.12 pyresample can use the geos, ortho and nsper projections with Basemap.
-Assuming the file **/tmp/areas.cfg** has the following area definition for an ortho projection area:
-
-.. code-block:: bash
-
- REGION: ortho {
-   NAME:    Ortho globe
-   PCS_ID:  ortho_globe
-   PCS_DEF: proj=ortho, a=6370997.0, lon_0=40, lat_0=-40
-   XSIZE: 640
-   YSIZE: 480
-   AREA_EXTENT:  (-10000000, -10000000, 10000000, 10000000) 
- };
-
-**Example usage:**
-
- >>> import numpy as np 
- >>> import pyresample as pr
- >>> lons = np.zeros(1000)
- >>> lats = np.arange(-80, -90, -0.01)
- >>> tb37v = np.arange(1000)
- >>> area_def = pr.utils.load_area('/tmp/areas.cfg', 'ortho')
- >>> swath_def = pr.geometry.SwathDefinition(lons, lats)
- >>> result = pr.kd_tree.resample_nearest(swath_def, tb37v, area_def, radius_of_influence=20000, fill_value=None)
- >>> pr.plot.save_quicklook('tb37v_ortho.png', area_def, result, num_meridians=0, num_parallels=0, label='Tb 37v (K)')
-
-Assuming **lons**, **lats** and **tb37v** are initialized with real data the result might look something like this:
-  .. image:: _static/images/tb37v_ortho.png
-
-
-Getting a Basemap object
-------------------------
-In order to make more advanced plots than the preconfigured quicklooks a Basemap object can be generated from an
-AreaDefintion using the **plot.area_def2basemap(area_def, **kwargs)** function.
-
-**Example usage:**
-
-.. doctest::
-
- >>> import numpy as np	
- >>> import matplotlib.pyplot as plt
- >>> import pyresample as pr
- >>> lons = np.zeros(1000)
- >>> lats = np.arange(-80, -90, -0.01)
- >>> tb37v = np.arange(1000)
- >>> area_def = pr.utils.load_area('/tmp/areas.cfg', 'ease_sh')
- >>> swath_def = pr.geometry.SwathDefinition(lons, lats)
- >>> result = pr.kd_tree.resample_nearest(swath_def, tb37v, area_def,
- ...                                      radius_of_influence=20000, fill_value=None)
- >>> bmap = pr.plot.area_def2basemap(area_def)
- >>> bmng = bmap.bluemarble()
- >>> col = bmap.imshow(result, origin='upper')
- >>> plt.savefig('/tmp/tb37v_bmng.png', bbox_inches='tight')
-
-Assuming **lons**, **lats** and **tb37v** are initialized with real data the result might look something like this:
-  .. image:: _static/images/tb37v_bmng.png
-  
-Any keyword arguments (not concerning the projection) passed to **plot.area_def2basemap** will be passed
-directly to the Basemap initialization.
-
-For more information on how to plot with Basemap please refer to the Basemap and matplotlib documentation.
-
-Limitations
------------
-The pyresample use of Basemap is basically a conversion from a pyresample AreaDefintion to a Basemap object
-which allows for correct plotting of a resampled dataset using the **basemap.imshow** function.
-
-Currently only the following set of Proj.4 arguments can be interpreted in the conversion: 
-{'proj', 'a', 'b', 'ellps', 'lon_0', 'lat_0', 'lon_1', 'lat_1', 'lon_2', 'lat_2', 'lat_ts'}
-
-Any other Proj.4 parameters will be ignored. 
-If the ellipsoid is not defined in terms of 'ellps', 'a' or ('a', 'b') it will default to WGS84.
-
-The xsize and ysize in an AreaDefinition will only be used during resampling when the image data for use in
-**basemap.imshow** is created. The actual size and shape of the final plot is handled by matplotlib.
+.. include:: plot_projections.rst
+.. include:: plot_cartopy_basemap.rst             
+             
+             
+.. _Satpy: http://www.github.com/pytroll/satpy
+.. _zenodo: https://doi.org/10.5281/zenodo.3553696
+.. _`Cartopy gallery example`: http://scitools.org.uk/cartopy/docs/v0.16/gallery/geostationary.html
+.. _Cartopy: http://scitools.org.uk/cartopy/

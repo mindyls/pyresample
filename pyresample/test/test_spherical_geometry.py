@@ -1,5 +1,3 @@
-from __future__ import with_statement
-
 import numpy as np
 import unittest
 import math
@@ -151,8 +149,8 @@ class TestOverlap(unittest.TestCase):
                           [57.304862819933433, 57.304862819933433]])
         area2 = geometry.SwathDefinition(lons2, lats2)
 
-        self.assertAlmostEqual(area1.overlap_rate(area2), 0.5, 2)
-        self.assertAlmostEqual(area2.overlap_rate(area1), 0.068, 3)
+        self.assertAlmostEqual(area1.overlap_rate(area2), 0.509, 2)
+        self.assertAlmostEqual(area2.overlap_rate(area1), 0.0685, 3)
 
 
 class TestSphereGeometry(unittest.TestCase):
@@ -409,18 +407,3 @@ class TestSphereGeometry(unittest.TestCase):
         self.assertFalse(arc45.intersects(arc02))
 
         self.assertTrue(arc35.intersects(arc24))
-
-
-def suite():
-    """The test suite.
-    """
-    loader = unittest.TestLoader()
-    mysuite = unittest.TestSuite()
-    mysuite.addTest(loader.loadTestsFromTestCase(TestOverlap))
-    mysuite.addTest(loader.loadTestsFromTestCase(TestSphereGeometry))
-
-    return mysuite
-
-
-if __name__ == '__main__':
-    unittest.main()
